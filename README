@@ -1,0 +1,10 @@
+A scribe client that complies with the messaging-client interface. Features include:
+
+* Non-blocking calls
+* Configurable timeouts of write calls
+* Auto-reconnect to scribe server
+* Log4j appender wrapper
+
+Dependencies: 
+* https://github.com/InMobi/messaging-client-core
+* netty
