@@ -66,8 +66,6 @@ public class ScribeHandler extends SimpleChannelHandler {
 		} 
 		scheduleReconnect();
 		
-		//bubble to enable default logging. This is really stoopid way
-		super.exceptionCaught(ctx, e);
 	}
 	
 	private void scheduleReconnect() {
