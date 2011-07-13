@@ -6,7 +6,7 @@ import org.jboss.netty.channel.socket.nio.*;
 import java.util.concurrent.*;
 
 class NettyEventCore {
-    private static NettyEventCore ourInstance = new NettyEventCore();
+    private static final NettyEventCore ourInstance = new NettyEventCore();
 
     private ClientSocketChannelFactory factory = null;
     private int leases = 0;

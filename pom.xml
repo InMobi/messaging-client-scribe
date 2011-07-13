@@ -63,10 +63,25 @@
 					<source>1.6</source>
 					<target>1.6</target>
 				</configuration>
-			</plugin>
+            </plugin>
 
-			<plugin>
-				<artifactId>maven-assembly-plugin</artifactId>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>2.1.2</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
 				<executions>
 					<execution>
 						<id>jar-with-dependencies</id>
