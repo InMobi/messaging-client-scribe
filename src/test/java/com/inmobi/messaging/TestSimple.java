@@ -119,7 +119,8 @@ public class TestSimple {
 		assertEquals(inspector.getSuccessCount(), success + loop);
 	}
 
-	@Test(timeOut = 10000)
+	// @Test(timeOut = 10000)
+	@Test(timeOut = 100000)
 	public void concurrentSend() throws TException, InterruptedException
 	{
 		final int loop = 1000;
