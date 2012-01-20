@@ -23,8 +23,9 @@ import com.inmobi.instrumentation.TimingAccumulator;
 import com.inmobi.messaging.netty.ScribeNettyImpl;
 
 import scribe.thrift.LogEntry;
-//import com.inmobi.stats.StatsExposer;
-//import com.inmobi.stats.EmitMondemand;
+import com.inmobi.stats.EmitterRegistery;
+import com.inmobi.stats.StatsEmitter;
+import com.inmobi.stats.StatsExposer;
 
 
 
@@ -36,25 +37,59 @@ public class ScribeMessagePublisher extends AppenderSkeleton implements MessageP
     private int backoffSeconds = 5;
     private int timeoutSeconds = 5;
     private String scribeCategory;
-    private boolean emitStats;
+    private String emitterConfig = null;
 
     private ScribeNettyImpl publisher;
 
-    private Object emitter = null;
+    private StatsEmitter emitter = null;
+    private ScribeStats scribeStats = null;
     private Class<?> emClass = null;
     private Class<?> seInterface = null;
+
+
+    private final class ScribeStats implements StatsExposer {
+
+        private TimingAccumulator stats;
+        private HashMap<String, String> contexts = new HashMap<String, String>();
+
+        ScribeStats(TimingAccumulator s) {
+            stats = s;
+            // XXX
+            // due to the inconsistency of the api, can't make sure category
+            // is always set to sane value. This will work for the log4j appender
+            // use case though.
+            // - praddy
+            contexts.put("category", getScribeCategory());
+            contexts.put("scribe_type", "application");
+        }
+
+        public HashMap<String, Number> getStats() {
+            HashMap<String, Number> hash = new HashMap<String, Number>();
+            hash.put("cumulativeNanoseconds", stats.getCumulativeNanoseconds());
+            hash.put("invocationCount", stats.getInvocationCount());
+            hash.put("successCount", stats.getSuccessCount());
+            hash.put("unhandledExceptionCount", stats.getUnhandledExceptionCount());
+            hash.put("gracefulTerminates", stats.getGracefulTerminates());
+            hash.put("inFlight", stats.getInFlight());
+            return hash;
+        }
+
+        public HashMap<String, String> getContexts() {
+            return contexts;
+        }
+    }
 
 
     public String getHostname() {
         return hostname;
     }
 
-    public boolean getEmitStats() {
-        return emitStats;
+    public String getEmitterConfig() {
+        return emitterConfig;
     }
 
-    public void setEmitStats(boolean emitStats) {
-        this.emitStats = emitStats;
+    public void setEmitterConfig(String emitterConfig) {
+        this.emitterConfig = emitterConfig;
     }
 
     public void setHostname(String hostname) {
@@ -99,76 +134,14 @@ public class ScribeMessagePublisher extends AppenderSkeleton implements MessageP
         {
             publisher = new ScribeNettyImpl(hostname, port, timeoutSeconds, backoffSeconds);
         }
-        if (emitStats && emitter == null) {
+        if (emitterConfig != null && emitter == null) {
             try {
-                ClassLoader cl = this.getClass().getClassLoader();
-                emClass = cl.loadClass("com.inmobi.stats.emitter.EmitMondemand");
-                seInterface = cl.loadClass("com.inmobi.stats.StatsExposer");
-
-                class ScribeStats {
-
-                    private TimingAccumulator stats;
-
-                    ScribeStats(TimingAccumulator s) {
-                        stats = s;
-                    }
-
-                    public HashMap<String, Number> getStats() {
-                        HashMap<String, Number> hash = new HashMap<String, Number>();
-                        hash.put("cumulativeNanoseconds", stats.getCumulativeNanoseconds());
-                        hash.put("invocationCount", stats.getInvocationCount());
-                        hash.put("successCount", stats.getSuccessCount());
-                        hash.put("unhandledExceptionCount", stats.getUnhandledExceptionCount());
-                        hash.put("gracefulTerminates", stats.getGracefulTerminates());
-                        hash.put("inFlight", stats.getInFlight());
-                        return hash;
-                    }
-                }
-
-                class ScribeStatsProxy implements InvocationHandler {
-
-                    private ScribeStats proxee = null;
-
-                    ScribeStatsProxy (ScribeStats s) {
-                        proxee = s;
-                    }
-
-                    public Object invoke(Object proxy, Method method, Object[] args) {
-                        try {
-                            Method m = proxee.getClass().getDeclaredMethod(
-                                    method.getName(),
-                                    method.getParameterTypes());
-                            return m.invoke(proxee, args);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            return null;
-                        }
-                    }
-                }
-
-                HashMap<String, String> contexts = new HashMap<String, String>();
-                // XXX
-                // due to the inconsistency of the api, can't make sure category
-                // is always set to sane value. This will work for the log4j appender
-                // use case though.
-                // - praddy
-                contexts.put("category", getScribeCategory());
-                contexts.put("scribe_type", "application");
-                Class<?>[] proto = {seInterface, String.class, HashMap.class};
-                ScribeStats s = new ScribeStats(publisher.getStats());
-                Object proxy = Proxy.newProxyInstance(
-                        s.getClass().getClassLoader(),
-                        new Class[] {seInterface},
-                        new ScribeStatsProxy(s));
-                Object[] params = {seInterface.cast(proxy), "scribe", contexts};
-                try {
-                    emitter = emClass.getConstructor(proto).newInstance(params);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                //emitter = new EmitMondemand(new ScribeStats(publisher.getStats()), "scribe", contexts);
-            } catch (ClassNotFoundException e) {
-                System.err.println("emitStats is set to true but couldn't load the following classes\nplease make sure that com.inmobi.stats is in your classpath");
+                emitter = EmitterRegistery.lookup(emitterConfig);
+                scribeStats =  new ScribeStats(publisher.getStats());
+                emitter.add(scribeStats);
+                emitter.start();
+            } catch (Exception e) {
+                System.err.println("Couldn't find or initialize the stats emitter class");
                 e.printStackTrace();
             }
         }
@@ -182,15 +155,10 @@ public class ScribeMessagePublisher extends AppenderSkeleton implements MessageP
         {
             publisher.close();
         }
-        if (emitter != null)
+        if (emitter != null && scribeStats != null)
         {
-            Class<?>[] proto = {};
-            Object[] params = {};
-            try {
-                emClass.getMethod("stop", proto).invoke(emitter, params);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            emitter.remove(scribeStats);
+            emitter.stop();
         }
     }
 
@@ -208,18 +176,10 @@ public class ScribeMessagePublisher extends AppenderSkeleton implements MessageP
         {
             TBase thriftObject = (TBase) o;
             publisher.publish(thriftObject);
-        } else {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            try {
-                ObjectOutputStream oos = new ObjectOutputStream(baos);
-                oos.writeObject(o);
-                oos.flush();
-                oos.close();
-                baos.close();
-                publisher.publish(baos.toByteArray());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        } else if (o instanceof byte[]) {
+            publisher.publish((byte[])o);
+        } else if (o instanceof String) {
+            publisher.publish(((String)o).getBytes());
         }
     }
 
