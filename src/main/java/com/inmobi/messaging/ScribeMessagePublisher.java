@@ -1,29 +1,17 @@
 package com.inmobi.messaging;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Proxy;
-import java.lang.reflect.Method;
 import java.nio.charset.Charset;
-import java.util.Collections;
 import java.util.HashMap;
 
 import org.apache.log4j.AppenderSkeleton;
 import org.apache.log4j.spi.LoggingEvent;
 import org.apache.thrift.TBase;
-import org.apache.thrift.TException;
-import org.apache.thrift.protocol.TBinaryProtocol;
-import org.apache.thrift.protocol.TProtocol;
-import org.apache.thrift.transport.TMemoryBuffer;
 
 import com.inmobi.instrumentation.TimingAccumulator;
 import com.inmobi.messaging.netty.ScribeNettyImpl;
 
 import scribe.thrift.LogEntry;
-import com.inmobi.stats.EmitterRegistery;
+import com.inmobi.stats.EmitterRegistry;
 import com.inmobi.stats.StatsEmitter;
 import com.inmobi.stats.StatsExposer;
 
@@ -43,8 +31,6 @@ public class ScribeMessagePublisher extends AppenderSkeleton implements MessageP
 
     private StatsEmitter emitter = null;
     private ScribeStats scribeStats = null;
-    private Class<?> emClass = null;
-    private Class<?> seInterface = null;
 
 
     private final class ScribeStats implements StatsExposer {
@@ -54,11 +40,6 @@ public class ScribeMessagePublisher extends AppenderSkeleton implements MessageP
 
         ScribeStats(TimingAccumulator s) {
             stats = s;
-            // XXX
-            // due to the inconsistency of the api, can't make sure category
-            // is always set to sane value. This will work for the log4j appender
-            // use case though.
-            // - praddy
             contexts.put("category", getScribeCategory());
             contexts.put("scribe_type", "application");
         }
@@ -136,12 +117,11 @@ public class ScribeMessagePublisher extends AppenderSkeleton implements MessageP
         }
         if (emitterConfig != null && emitter == null) {
             try {
-                emitter = EmitterRegistery.lookup(emitterConfig);
+                emitter = EmitterRegistry.lookup(emitterConfig);
                 scribeStats =  new ScribeStats(publisher.getStats());
                 emitter.add(scribeStats);
-                emitter.start();
             } catch (Exception e) {
-                System.err.println("Couldn't find or initialize the stats emitter class");
+                System.err.println("Couldn't find or initialize the configured stats emitter");
                 e.printStackTrace();
             }
         }
@@ -158,7 +138,6 @@ public class ScribeMessagePublisher extends AppenderSkeleton implements MessageP
         if (emitter != null && scribeStats != null)
         {
             emitter.remove(scribeStats);
-            emitter.stop();
         }
     }
 
