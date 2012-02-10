@@ -12,6 +12,10 @@
 			<id>repository.jboss.org</id>
 			<url>http://repository.jboss.org/nexus/content/groups/public/</url>
 		</repository>
+        <repository>
+            <id>repository.cloudera.com</id>
+            <url>https://repository.cloudera.com/content/repositories/third-party/</url>
+        </repository>
 	</repositories>
 	<dependencies>
 		<dependency>
@@ -33,7 +37,7 @@
 		<dependency>
 			<groupId>se.cgbystrom.netty</groupId>
 			<artifactId>netty-tools</artifactId>
-			<version>1.2.1</version>
+			<version>1.2.2</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
