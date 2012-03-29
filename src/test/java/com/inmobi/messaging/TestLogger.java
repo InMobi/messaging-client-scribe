@@ -29,27 +29,27 @@ public class TestLogger {
 	
 	@Test
 	public void log() throws InterruptedException
-	{
-		server.start();
+    {
+        server.start();
 
-		PropertyConfigurator.configure("src/test/resources/log-four-jay.properties");
-		
-		Logger l = Logger.getLogger("localscribe");
-		TimingAccumulator inspector = ((ScribeMessagePublisher)l.getAppender("SA2")).getStats();
-		
-		LogEntry le = new LogEntry();
-		le.category="xxxx";
-		le.message="massage";
-		
-		long success = inspector.getSuccessCount();
+        PropertyConfigurator.configure("src/test/resources/log-four-jay.properties");
 
-		l.fatal(le);
+        Logger l = Logger.getLogger("localscribe");
+        TimingAccumulator inspector = ((ScribeMessagePublisher)l.getAppender("SA2")).getStats();
 
-		//Wait for all operations to complete
-		while(inspector.getInFlight() != 0)
-		{
-			Thread.sleep(1000);
-		}
-		assertEquals(inspector.getSuccessCount(), success + 1);
-	}
+        LogEntry le = new LogEntry();
+        le.category="xxxx";
+        le.message="massage";
+
+        long success = inspector.getSuccessCount();
+
+        l.fatal(le);
+
+        //Wait for all operations to complete
+        while(inspector.getInFlight() != 0)
+        {
+            Thread.sleep(1000);
+        }
+        assertEquals(inspector.getSuccessCount(), success + 1);
+    }
 }

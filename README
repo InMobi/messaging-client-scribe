@@ -8,3 +8,4 @@ A scribe client that complies with the messaging-client interface. Features incl
 Dependencies: 
 * https://github.com/InMobi/messaging-client-core
 * netty
+* https://github.com/InMobi/inmobi-stats/tree/master/common

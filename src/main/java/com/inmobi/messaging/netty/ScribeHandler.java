@@ -17,6 +17,14 @@ import org.jboss.netty.util.TimerTask;
 import com.inmobi.instrumentation.TimingAccumulator;
 import com.inmobi.instrumentation.TimingAccumulator.Outcome;
 import com.inmobi.messaging.netty.ScribeNettyImpl.ChannelSetter;
+import org.apache.thrift.transport.TMemoryInputTransport;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TMessage;
+import org.apache.thrift.protocol.TMessageType;
+import org.apache.thrift.protocol.TField;
+import org.apache.thrift.protocol.TProtocolUtil;
+import org.apache.thrift.protocol.TType;
+import scribe.thrift.ResultCode;
 
 public class ScribeHandler extends SimpleChannelHandler {
 	private final TimingAccumulator stats;
@@ -38,21 +46,38 @@ public class ScribeHandler extends SimpleChannelHandler {
 	public void messageReceived(ChannelHandlerContext ctx, MessageEvent e)
 			throws Exception {
 		
+        ResultCode success;
 		ChannelBuffer buf = (ChannelBuffer) e.getMessage();
-		//TODO: get a grip on response parsing
-		stats.accumulateOutcomeWithDelta(Outcome.SUCCESS, 0);
-		
-		
-//		if(buf.readableBytes() == 20) {
-//			stats.accumulateOutcomeWithDelta(buf.getByte(18) == 0x00 ? Outcome.SUCCESS : Outcome.GRACEFUL_FAILURE, 0);
-//		} else {
-//			/*
-//			 * TODO:
-//			 * WTF! Scribe response is always 23 bytes
-//			 * I Know TCP is stream protocol and all but no 23 bytes?
-//			 */
-//			stats.accumulateOutcomeWithDelta(Outcome.UNHANDLED_FAILURE, 0);
-//		}
+        TMemoryInputTransport trans = new TMemoryInputTransport(buf.array());
+        TBinaryProtocol proto = new TBinaryProtocol(trans);
+        TMessage msg = proto.readMessageBegin();
+        if (msg.type == TMessageType.EXCEPTION) {
+            proto.readMessageEnd();
+        }
+        TField field;
+        proto.readStructBegin();
+        while (true)
+        {
+            field = proto.readFieldBegin();
+            if (field.type == TType.STOP) {
+                break;
+            }
+            switch (field.id) {
+                case 0: // SUCCESS
+                    if (field.type == TType.I32) {
+                        success = ResultCode.findByValue(proto.readI32());
+                        stats.accumulateOutcomeWithDelta(success.getValue() == 0 ? Outcome.SUCCESS : Outcome.GRACEFUL_FAILURE, 0);
+                    } else {
+                        TProtocolUtil.skip(proto, field.type);
+                    }
+                    break;
+                default:
+                    TProtocolUtil.skip(proto, field.type);
+            }
+            proto.readFieldEnd();
+        }
+        proto.readStructEnd();
+        proto.readMessageEnd();
 	}
 
 	@Override
