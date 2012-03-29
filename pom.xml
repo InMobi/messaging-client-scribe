@@ -31,10 +31,10 @@
 			<version>[1.6.1,1.7.0)</version>
 		</dependency>
 		<dependency>
-			<groupId>se.cgbystrom.netty</groupId>
-			<artifactId>netty-tools</artifactId>
-			<version>1.2.0</version>
-			<scope>test</scope>
+            <groupId>com.cgbystrom</groupId>
+            <artifactId>netty-tools</artifactId>
+            <version>[1.2.2,2.0.0)</version>
+            <scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.jboss.netty</groupId>
